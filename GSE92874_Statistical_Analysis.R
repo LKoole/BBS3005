@@ -115,6 +115,12 @@ dev.off()
 labels <- paste(desc$group, desc$individual)
 glMDSPlot(logcounts, labels=labels, groups=factor(desc$group), folder="mds")
 
+## Create separate PCA plot ## 
+library(ggfortify)
+pca_res <- prcomp(t(logcounts), scale. = TRUE)
+# x is the PCA number on x axis, y is PCA number on y-axis
+autoplot(pca_res, labels=labels, data = t(logcounts), colour = col.cell,
+         label = FALSE, size = 7, x = 2, y = 3)
 
 ## Hierarchical clustering with heatmap ##
 # We estimate the variance for each row in the logcounts matrix
