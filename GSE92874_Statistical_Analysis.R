@@ -171,14 +171,16 @@ dev.off()
 
 ## Determine differentially expressed genes ##
 diff.genes <- filter(dat.expr, q_value < 0.05 & (log2_fold_change > 1 | log2_fold_change < -1))
+# Eliminate NA values
+diff.genes.noNA <- diff.genes[which(!diff.genes$entrezid=="NA"),]
 
 # Export list of differentially expressed genes to txt files
-write.table(diff.genes[,1], "GSE92874_DEG_filtered.txt", sep = "\t", dec = ".", 
+write.table(diff.genes.noNA[,1], "GSE92874_DEG_filtered.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
 write.table(dat2[,1], "GSE92874_background_genes.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
 
-
+                            
 ## GO annotation of DEGs ##
 annGO.Deg <- AnnotationDbi::select(org.Hs.eg.db,keys=diff.genes[,1], keytype = "SYMBOL", 
                                 columns=c("ENTREZID", "SYMBOL", "GO"))
