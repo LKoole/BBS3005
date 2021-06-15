@@ -70,7 +70,8 @@ dat.expr <- dat2[keep, ]
 
 write.table(dat.expr, "GSE92874_filtered_data.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
-
+write.table(dat.expr[,c(1,10,11,12,14,15)], "GSE92874_filtered_data2.txt", sep = "\t", dec = ".", 
+            quote = FALSE, row.names = FALSE, col.names = TRUE)
 
 # Transform counts to log2 scale 
 logcounts <- log(countdata.expr, 2)
@@ -183,6 +184,8 @@ diff.genes.noNA <- diff.genes[which(!diff.genes$entrezid=="NA"),]
 # Export list of differentially expressed genes to txt files
 write.table(diff.genes.noNA[,1], "GSE92874_DEG_filtered.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
+write.table(diff.genes.noNA[,15], "GSE92874_DEG_filtered_UP.txt", sep = "\t", dec = ".", 
+            quote = FALSE, row.names = FALSE, col.names = "UniprotID")
 write.table(dat2[,1], "GSE92874_background_genes.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
 
@@ -199,3 +202,83 @@ annGO.Deg.BP <- annGO.Deg[which(annGO.Deg$ONTOLOGY=="BP"),]
 
 write.table(annGO.Deg.BP, "GSE92874_DEG_GOBP.txt", sep = "\t", dec = ".", 
             quote = FALSE, row.names = FALSE, col.names = TRUE)
+    
+                            
+## Create MD plots ##
+par(mfrow = c(1,2))
+plotMD(logcounts, column = 5)
+abline(h=0,col="grey")
+plotMD(logcounts, column = 6)
+abline(h=0,col="grey")
+
+
+## Volcano plot ##
+deseq.threshold <- as.factor((dat.expr$log2_fold_change < -1 | dat.expr$log2_fold_change > 1) & 
+  dat.expr$q_value < 0.05)
+deseq.upreg <- as.factor(dat.expr$log2_fold_change > 1 & dat.expr$q_value < 0.05)
+deseq.downreg <- as.factor(dat.expr$log2_fold_change < -1 & dat.expr$q_value < 0.05)
+deseq <- as.factor(paste(deseq.downreg, deseq.upreg))
+
+# Get the indices of interesting genes using the threshold
+xi <- which(deseq.threshold == TRUE)
+
+# Number of interesting genes
+length(xi)
+
+# Load ggrepel package
+library(ggrepel)
+
+# Set up colour vector for celltype variable
+col.deg <- c("gray25", "indianred", "cornflowerblue")[deseq]
+fc <- log2_fold_change
+padj <- q_value
+
+g = ggplot(data=dat.expr, 
+           aes(x=log2_fold_change, y=-log10(q_value))) +
+  # Define the look of the points
+  geom_point(alpha=0.4, size=1.75, colour=col.deg) +
+  # Hide the legend
+  theme(legend.position = "none") +
+  # Apply another theme
+  theme_bw() + theme(legend.position="none") +
+  # Add the lines separating the DEGs
+  geom_vline(xintercept = 1, color = 'gray69') +
+  geom_vline(xintercept = -1, color = 'gray69') +
+  geom_hline(yintercept = -log10(0.05), color = 'gray69') +
+  xlab("Log2 fold change (Log2FC)") + ylab("-log10(Padj)") +
+  ggtitle("IPSC trisomic vs disomic DEGs according to cuffdiff\nwith FDR <= 0.05 and absolute FC >= 1 or FC <= -1") +
+  # Add the text labels only for DEGs. Using `ggrepel` to make sure labels don't overlap
+  # Note: p-value threshold is set very low, to only highlight very significant genes
+  geom_text_repel(aes(label=ifelse(q_value < 0.1e-2 & (log2_fold_change < -1 | log2_fold_change > 1),
+                                   gene, '')))
+
+# Show the plot
+g
+dev.off()
+
+## Alternative method of making a volcano plot ##
+# Base plot
+with(dat.expr, plot(fc, -log10(padj), pch=20,
+                         main=paste("IPSC trisomic vs disomic DEGs according to cuffdiff",
+                                    "with FDR <= 0.05 and absolute FC >= 1", sep="\n"), xaxt = 'n'))
+
+# Add custom x-axis with more ticks (default was (-)2, 4, 6)
+# NOTE: adjust for your own data!
+axis(side = 1, at = seq(-6, 9, 1))
+
+with(subset(dat.expr, q_value < 0.05), 
+     # Add points for statistically significant genes
+     points(log2_fold_change, -log10(q_value), pch=20, col="red"))
+
+with(subset(dat.expr, log2_fold_change > 1 | log2_fold_change < -1), 
+     # Add points for expression > logfc_threshold
+     points(log2_fold_change, -log10(q_value), pch=20, col="orange"))
+
+with(subset(dat.expr, q_value < 0.05 & abs(log2_fold_change) > 1), 
+     # Add points based on both significance and expression
+     points(log2_fold_change, -log10(q_value), pch=20, col="green"))
+
+# Add threshold lines
+abline(h=-log10(0.05), lwd=1.5, lty=2, col='gray')
+abline(v=c(-1, 1), lwd=1.5, lty=2, col='gray')
+dev.off()
